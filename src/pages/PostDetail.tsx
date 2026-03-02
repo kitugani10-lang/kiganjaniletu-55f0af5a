@@ -23,6 +23,9 @@ const PostDetail = () => {
 
     if (!data) { setLoading(false); return; }
 
+    // Increment view
+    supabase.rpc('increment_post_views', { post_ids: [id] }).then();
+
     const { data: likesData } = await supabase
       .from('likes')
       .select('user_id')
@@ -37,6 +40,7 @@ const PostDetail = () => {
       ...data,
       author: data.author,
       image_urls: (data as any).image_urls || [],
+      views: (data as any).views || 0,
       likes_count: likesData?.length || 0,
       comments_count: commentsData?.length || 0,
       user_liked: user ? likesData?.some(l => l.user_id === user.id) || false : false,

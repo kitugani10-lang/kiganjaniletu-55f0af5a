@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { toast } from 'sonner';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import logo from '@/assets/logo.png';
+import { validateUsername } from '@/lib/usernameValidation';
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -22,16 +23,19 @@ const Auth = () => {
       toast.error('Please enter your email');
       return;
     }
-    if (isSignUp && !username) {
-      toast.error('Please enter a username');
-      return;
+    if (isSignUp) {
+      const usernameError = validateUsername(username);
+      if (usernameError) {
+        toast.error(usernameError);
+        return;
+      }
     }
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          data: isSignUp ? { username } : undefined,
+          data: isSignUp ? { username: username.trim() } : undefined,
         },
       });
       if (error) throw error;
@@ -92,12 +96,18 @@ const Auth = () => {
                 onChange={(e) => setEmail(e.target.value)}
               />
               {isSignUp && (
-                <Input
-                  type="text"
-                  placeholder="Choose a username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
+                <div>
+                  <Input
+                    type="text"
+                    placeholder="Choose a username (6-20 characters)"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    maxLength={20}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Letters, numbers, and _ only. 6-20 characters.
+                  </p>
+                </div>
               )}
               <Button onClick={handleSendOtp} disabled={loading} className="w-full">
                 {loading ? 'Sending...' : 'Send Verification Code'}

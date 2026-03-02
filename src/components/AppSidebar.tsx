@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { NavLink } from '@/components/NavLink';
 import { CATEGORIES } from '@/lib/categories';
 import { Home, Bookmark, LogOut, LogIn } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import {
   Sidebar,
   SidebarContent,
@@ -19,7 +20,6 @@ export function AppSidebar() {
   const { user, signOut } = useAuth();
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const location = useLocation();
 
   return (
     <Sidebar collapsible="icon">
@@ -95,6 +95,11 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <ThemeToggle collapsed={collapsed} />
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

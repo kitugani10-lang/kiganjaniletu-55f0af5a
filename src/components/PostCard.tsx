@@ -5,8 +5,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Heart, MessageCircle, Share2, Send, Bookmark, BookmarkCheck } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Send, Bookmark, BookmarkCheck, Eye, Pencil, Trash2, X, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { CATEGORIES } from '@/lib/categories';
@@ -22,6 +23,7 @@ interface Post {
   user_liked: boolean;
   image_urls?: string[];
   category?: string;
+  views?: number;
 }
 
 interface Comment {
@@ -31,6 +33,10 @@ interface Comment {
   author: { id: string; username: string };
 }
 
+const canEdit = (createdAt: string) => {
+  return (Date.now() - new Date(createdAt).getTime()) < 12 * 60 * 60 * 1000;
+};
+
 const PostCard = ({ post, onUpdate }: { post: Post; onUpdate: () => void }) => {
   const { user } = useAuth();
   const [showComments, setShowComments] = useState(false);
@@ -38,8 +44,14 @@ const PostCard = ({ post, onUpdate }: { post: Post; onUpdate: () => void }) => {
   const [newComment, setNewComment] = useState('');
   const [loadingComment, setLoadingComment] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
+  const [editingPost, setEditingPost] = useState(false);
+  const [editTitle, setEditTitle] = useState(post.title);
+  const [editContent, setEditContent] = useState(post.content);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editCommentContent, setEditCommentContent] = useState('');
 
   const categoryInfo = CATEGORIES.find(c => c.slug === post.category);
+  const isAuthor = user?.id === post.author.id;
 
   useEffect(() => {
     if (user) {
@@ -121,33 +133,112 @@ const PostCard = ({ post, onUpdate }: { post: Post; onUpdate: () => void }) => {
     } catch { toast.error('Failed to update bookmark'); }
   };
 
+  const handleDeletePost = async () => {
+    if (!confirm('Are you sure you want to delete this post?')) return;
+    try {
+      const { error } = await supabase.from('posts').delete().eq('id', post.id);
+      if (error) throw error;
+      toast.success('Post deleted');
+      onUpdate();
+    } catch { toast.error('Failed to delete post'); }
+  };
+
+  const handleSavePostEdit = async () => {
+    if (!editTitle.trim() || !editContent.trim()) { toast.error('Title and content required'); return; }
+    try {
+      const { error } = await supabase.from('posts').update({
+        title: editTitle.trim(), content: editContent.trim(),
+      }).eq('id', post.id);
+      if (error) throw error;
+      toast.success('Post updated');
+      setEditingPost(false);
+      onUpdate();
+    } catch { toast.error('Failed to update post'); }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!confirm('Delete this comment?')) return;
+    try {
+      await supabase.from('comments').delete().eq('id', commentId);
+      toast.success('Comment deleted');
+      fetchComments();
+      onUpdate();
+    } catch { toast.error('Failed to delete comment'); }
+  };
+
+  const handleSaveCommentEdit = async (commentId: string) => {
+    if (!editCommentContent.trim()) return;
+    try {
+      const { error } = await supabase.from('comments').update({ content: editCommentContent.trim() }).eq('id', commentId);
+      if (error) throw error;
+      toast.success('Comment updated');
+      setEditingCommentId(null);
+      fetchComments();
+    } catch { toast.error('Failed to update comment'); }
+  };
+
+  const authorDisplay = (
+    <div className="flex items-center gap-2">
+      {user ? (
+        <Link to={`/profile/${post.author.id}`} className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold text-sm hover:opacity-80">
+          {post.author.username.charAt(0).toUpperCase()}
+        </Link>
+      ) : (
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground font-bold text-sm">
+          {post.author.username.charAt(0).toUpperCase()}
+        </div>
+      )}
+      <div>
+        {user ? (
+          <Link to={`/profile/${post.author.id}`} className="font-semibold text-sm hover:underline">{post.author.username}</Link>
+        ) : (
+          <p className="font-semibold text-sm">{post.author.username}</p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+        </p>
+      </div>
+    </div>
+  );
+
   return (
     <Card className="shadow-card hover:shadow-card-hover transition-shadow">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <Link to={`/profile/${post.author.id}`} className="flex items-center gap-2 hover:opacity-80">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold text-sm">
-              {post.author.username.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <p className="font-semibold text-sm">{post.author.username}</p>
-              <p className="text-xs text-muted-foreground">
-                {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-              </p>
-            </div>
-          </Link>
-          {categoryInfo && (
-            <Badge variant="secondary" className="text-xs">
-              {categoryInfo.label}
-            </Badge>
-          )}
+          {authorDisplay}
+          <div className="flex items-center gap-2">
+            {categoryInfo && (
+              <Badge variant="secondary" className="text-xs">{categoryInfo.label}</Badge>
+            )}
+            {isAuthor && (
+              <div className="flex items-center gap-1">
+                {canEdit(post.created_at) && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingPost(true); setEditTitle(post.title); setEditContent(post.content); }}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={handleDeletePost}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
-        <h3 className="text-lg font-bold mt-2" style={{ fontFamily: 'var(--font-heading)' }}>
-          {post.title}
-        </h3>
+        {editingPost ? (
+          <div className="space-y-2 mt-2">
+            <Input value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Title" />
+            <Textarea value={editContent} onChange={e => setEditContent(e.target.value)} rows={4} />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSavePostEdit} className="gap-1"><Check className="h-3.5 w-3.5" /> Save</Button>
+              <Button size="sm" variant="outline" onClick={() => setEditingPost(false)} className="gap-1"><X className="h-3.5 w-3.5" /> Cancel</Button>
+            </div>
+          </div>
+        ) : (
+          <h3 className="text-lg font-bold mt-2" style={{ fontFamily: 'var(--font-heading)' }}>{post.title}</h3>
+        )}
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-foreground/90 whitespace-pre-wrap">{post.content}</p>
+        {!editingPost && <p className="text-foreground/90 whitespace-pre-wrap">{post.content}</p>}
 
         {post.image_urls && post.image_urls.length > 0 && (
           <div className={`grid gap-2 ${post.image_urls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
@@ -166,6 +257,10 @@ const PostCard = ({ post, onUpdate }: { post: Post; onUpdate: () => void }) => {
             <MessageCircle className="h-4 w-4" />
             {post.comments_count}
           </Button>
+          <span className="flex items-center gap-1 text-xs text-muted-foreground px-2">
+            <Eye className="h-3.5 w-3.5" />
+            {post.views || 0}
+          </span>
           <Button variant="ghost" size="sm" onClick={handleShare} className="gap-1.5">
             <Share2 className="h-4 w-4" />
           </Button>
@@ -178,22 +273,61 @@ const PostCard = ({ post, onUpdate }: { post: Post; onUpdate: () => void }) => {
 
         {showComments && (
           <div className="space-y-3 pt-2 border-t">
-            {comments.map((c) => (
-              <div key={c.id} className="flex gap-2">
-                <Link to={`/profile/${c.author.id}`}>
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground font-bold text-xs">
-                    {c.author.username.charAt(0).toUpperCase()}
+            {comments.map((c) => {
+              const isCommentAuthor = user?.id === c.author.id;
+              return (
+                <div key={c.id} className="flex gap-2">
+                  {user ? (
+                    <Link to={`/profile/${c.author.id}`}>
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground font-bold text-xs">
+                        {c.author.username.charAt(0).toUpperCase()}
+                      </div>
+                    </Link>
+                  ) : (
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground font-bold text-xs">
+                      {c.author.username.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="bg-muted rounded-lg px-3 py-2 flex-1">
+                    <div className="flex items-center justify-between">
+                      {user ? (
+                        <Link to={`/profile/${c.author.id}`} className="text-xs font-semibold hover:underline">{c.author.username}</Link>
+                      ) : (
+                        <span className="text-xs font-semibold">{c.author.username}</span>
+                      )}
+                      {isCommentAuthor && (
+                        <div className="flex items-center gap-1">
+                          {canEdit(c.created_at) && (
+                            <button onClick={() => { setEditingCommentId(c.id); setEditCommentContent(c.content); }} className="text-muted-foreground hover:text-foreground">
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                          )}
+                          <button onClick={() => handleDeleteComment(c.id)} className="text-muted-foreground hover:text-destructive">
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {editingCommentId === c.id ? (
+                      <div className="mt-1 space-y-1">
+                        <Textarea value={editCommentContent} onChange={e => setEditCommentContent(e.target.value)} rows={2} className="text-sm" />
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="default" className="h-6 text-xs" onClick={() => handleSaveCommentEdit(c.id)}>Save</Button>
+                          <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setEditingCommentId(null)}>Cancel</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-sm">{c.content}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
+                        </p>
+                      </>
+                    )}
                   </div>
-                </Link>
-                <div className="bg-muted rounded-lg px-3 py-2 flex-1">
-                  <Link to={`/profile/${c.author.id}`} className="text-xs font-semibold hover:underline">{c.author.username}</Link>
-                  <p className="text-sm">{c.content}</p>
-                  <p className="text-[10px] text-muted-foreground mt-1">
-                    {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
-                  </p>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {user && (
               <div className="flex gap-2">
                 <Textarea placeholder="Write a comment..." value={newComment} onChange={(e) => setNewComment(e.target.value)} rows={2} className="flex-1" />

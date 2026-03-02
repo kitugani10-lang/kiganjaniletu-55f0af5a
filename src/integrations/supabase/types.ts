@@ -190,6 +190,7 @@ export type Database = {
           image_urls: string[] | null
           title: string
           updated_at: string
+          views: number
         }
         Insert: {
           author_id: string
@@ -200,6 +201,7 @@ export type Database = {
           image_urls?: string[] | null
           title: string
           updated_at?: string
+          views?: number
         }
         Update: {
           author_id?: string
@@ -210,6 +212,7 @@ export type Database = {
           image_urls?: string[] | null
           title?: string
           updated_at?: string
+          views?: number
         }
         Relationships: [
           {
@@ -256,7 +259,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_post_views: { Args: { post_ids: string[] }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

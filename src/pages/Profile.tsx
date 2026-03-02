@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import Navbar from '@/components/Navbar';
@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Pencil, Save, X, MapPin, User, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
+import { validateUsername } from '@/lib/usernameValidation';
 
 interface ProfileData {
   id: string;
@@ -25,6 +26,7 @@ interface ProfileData {
 const Profile = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,6 +36,14 @@ const Profile = () => {
   const [saving, setSaving] = useState(false);
 
   const isOwnProfile = user?.id === id;
+
+  // Guests can't view profiles
+  useEffect(() => {
+    if (!user) {
+      toast.error('Please sign in to view profiles');
+      navigate('/auth');
+    }
+  }, [user, navigate]);
 
   const fetchProfile = async () => {
     if (!id) return;
@@ -60,12 +70,12 @@ const Profile = () => {
     if (!postsData) { setLoading(false); return; }
 
     const postIds = postsData.map(p => p.id);
-    const { data: likesData } = await supabase.from('likes').select('post_id, user_id').in('post_id', postIds);
-    const { data: commentsData } = await supabase.from('comments').select('post_id').in('post_id', postIds);
+    const { data: likesData } = await supabase.from('likes').select('post_id, user_id').in('post_id', postIds.length > 0 ? postIds : ['none']);
+    const { data: commentsData } = await supabase.from('comments').select('post_id').in('post_id', postIds.length > 0 ? postIds : ['none']);
 
     const enriched = postsData.map((p: any) => ({
       id: p.id, title: p.title, content: p.content, created_at: p.created_at,
-      author: p.author, image_urls: p.image_urls || [], category: p.category,
+      author: p.author, image_urls: p.image_urls || [], category: p.category, views: p.views || 0,
       likes_count: likesData?.filter(l => l.post_id === p.id).length || 0,
       comments_count: commentsData?.filter(c => c.post_id === p.id).length || 0,
       user_liked: user ? likesData?.some(l => l.post_id === p.id && l.user_id === user.id) || false : false,
@@ -75,12 +85,15 @@ const Profile = () => {
   };
 
   useEffect(() => {
-    fetchProfile();
-    fetchPosts();
+    if (user) {
+      fetchProfile();
+      fetchPosts();
+    }
   }, [id, user]);
 
   const handleSave = async () => {
-    if (!form.username.trim()) { toast.error('Username is required'); return; }
+    const usernameError = validateUsername(form.username);
+    if (usernameError) { toast.error(usernameError); return; }
     setSaving(true);
     try {
       let avatar_url = profile?.avatar_url;
@@ -109,6 +122,8 @@ const Profile = () => {
       setSaving(false);
     }
   };
+
+  if (!user) return null;
 
   if (loading && !profile) return (
     <div className="min-h-screen bg-background">
@@ -157,7 +172,10 @@ const Profile = () => {
             <CardContent>
               {editing ? (
                 <div className="space-y-3 pt-2">
-                  <Input placeholder="Username" value={form.username} onChange={e => setForm({...form, username: e.target.value})} />
+                  <div>
+                    <Input placeholder="Username (6-20 characters)" value={form.username} onChange={e => setForm({...form, username: e.target.value})} maxLength={20} />
+                    <p className="text-xs text-muted-foreground mt-1">Letters, numbers, and _ only. 6-20 characters.</p>
+                  </div>
                   <Input placeholder="Location (e.g. Dar es Salaam)" value={form.location} onChange={e => setForm({...form, location: e.target.value})} />
                   <Select value={form.gender} onValueChange={v => setForm({...form, gender: v})}>
                     <SelectTrigger><SelectValue placeholder="Gender" /></SelectTrigger>
