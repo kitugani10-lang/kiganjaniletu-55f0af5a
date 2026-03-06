@@ -7,14 +7,14 @@ import CreatePostDialog from '@/components/CreatePostDialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search } from 'lucide-react';
+import { Search, FileText, MessageSquare } from 'lucide-react';
 
 interface PostData {
   id: string;
   title: string;
   content: string;
   created_at: string;
-  author: { id: string; username: string };
+  author: { id: string; username: string; is_verified?: boolean };
   likes_count: number;
   comments_count: number;
   user_liked: boolean;
@@ -34,7 +34,7 @@ const Index = () => {
   const fetchPosts = useCallback(async () => {
     const { data: postsData } = await supabase
       .from('posts')
-      .select('*, author:profiles!posts_author_id_fkey(id, username)')
+      .select('*, author:profiles!posts_author_id_fkey(id, username, is_verified)')
       .order('created_at', { ascending: false });
 
     if (!postsData) { setLoading(false); return; }
@@ -52,10 +52,13 @@ const Index = () => {
       user_liked: user ? likesData?.some(l => l.post_id === p.id && l.user_id === user.id) || false : false,
     }));
 
+    // Sort: verified authors get a boost, then by engagement + time
     const sorted = [...enriched].sort((a, b) => {
-      const score = (eng: number, time: number) => time + eng * 3600000;
-      return score(b.likes_count + b.comments_count, new Date(b.created_at).getTime())
-        - score(a.likes_count + a.comments_count, new Date(a.created_at).getTime());
+      const VERIFIED_BOOST = 7200000; // 2 hours boost in ms
+      const score = (eng: number, time: number, verified: boolean) =>
+        time + eng * 3600000 + (verified ? VERIFIED_BOOST : 0);
+      return score(b.likes_count + b.comments_count, new Date(b.created_at).getTime(), !!b.author.is_verified)
+        - score(a.likes_count + a.comments_count, new Date(a.created_at).getTime(), !!a.author.is_verified);
     });
 
     setPosts(sorted);
@@ -81,10 +84,32 @@ const Index = () => {
   const visible = filtered.slice(0, visibleCount);
   const hasMore = visibleCount < filtered.length;
 
+  // Forum stats
+  const totalPosts = posts.filter(p => p.content.length <= 500).length;
+  const totalThreads = posts.filter(p => p.content.length > 500).length;
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
       <main className="container mx-auto max-w-2xl px-4 py-6">
+        {/* Forum Stats */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="flex items-center gap-3 rounded-lg border bg-card p-3">
+            <FileText className="h-5 w-5 text-primary" />
+            <div>
+              <p className="text-lg font-bold">{totalPosts}</p>
+              <p className="text-xs text-muted-foreground">Posts (≤500 chars)</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 rounded-lg border bg-card p-3">
+            <MessageSquare className="h-5 w-5 text-primary" />
+            <div>
+              <p className="text-lg font-bold">{totalThreads}</p>
+              <p className="text-xs text-muted-foreground">Threads (500+ chars)</p>
+            </div>
+          </div>
+        </div>
+
         <div className="flex items-center justify-between mb-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

@@ -21,7 +21,7 @@ const CategoryFeed = () => {
     if (!slug) return;
     const { data: postsData } = await supabase
       .from('posts')
-      .select('*, author:profiles!posts_author_id_fkey(id, username)')
+      .select('*, author:profiles!posts_author_id_fkey(id, username, is_verified)')
       .eq('category', slug)
       .order('created_at', { ascending: false });
 

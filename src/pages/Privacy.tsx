@@ -45,7 +45,7 @@ const Privacy = () => (
           <ul className="list-disc pl-5 space-y-1 text-sm text-foreground/90">
             <li>We <strong>do not sell</strong> your personal data to anyone</li>
             <li>IP addresses are <strong>never shared, sold, or misused</strong></li>
-            <li>Your data may be processed by our service providers (Supabase, Vercel) solely for operational purposes</li>
+            <li>Your data may be processed by trusted service providers solely for operational purposes</li>
           </ul>
         </section>
 

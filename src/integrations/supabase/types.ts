@@ -243,6 +243,7 @@ export type Database = {
           gender: string | null
           id: string
           ip_address: unknown
+          is_verified: boolean
           last_login_ip: unknown
           last_name: string | null
           location: string | null
@@ -256,6 +257,7 @@ export type Database = {
           gender?: string | null
           id: string
           ip_address?: unknown
+          is_verified?: boolean
           last_login_ip?: unknown
           last_name?: string | null
           location?: string | null
@@ -269,6 +271,7 @@ export type Database = {
           gender?: string | null
           id?: string
           ip_address?: unknown
+          is_verified?: boolean
           last_login_ip?: unknown
           last_name?: string | null
           location?: string | null

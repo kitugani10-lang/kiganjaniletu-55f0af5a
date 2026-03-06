@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Heart, MessageCircle, Share2, Send, Bookmark, BookmarkCheck, Pencil, Trash2, X, Check, Flag, Reply, ImagePlus, Video } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Send, Bookmark, BookmarkCheck, Pencil, Trash2, X, Check, Flag, Reply, ImagePlus, Video, BadgeCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { CATEGORIES } from '@/lib/categories';
@@ -19,7 +19,7 @@ interface Post {
   title: string;
   content: string;
   created_at: string;
-  author: { id: string; username: string };
+  author: { id: string; username: string; is_verified?: boolean };
   likes_count: number;
   comments_count: number;
   user_liked: boolean;
@@ -31,7 +31,7 @@ interface Comment {
   id: string;
   content: string;
   created_at: string;
-  author: { id: string; username: string };
+  author: { id: string; username: string; is_verified?: boolean };
   parent_comment_id: string | null;
   media_url: string | null;
 }
@@ -46,6 +46,10 @@ const canEditTime = (createdAt: string) => {
 const canDeleteTime = (createdAt: string) => {
   return (Date.now() - new Date(createdAt).getTime()) < 48 * 60 * 60 * 1000;
 };
+
+const VerifiedBadge = () => (
+  <BadgeCheck className="h-4 w-4 text-blue-500 inline-block ml-0.5 shrink-0" />
+);
 
 const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }: { post: Post; onUpdate: () => void; expanded?: boolean; autoShowComments?: boolean }) => {
   const { user } = useAuth();
@@ -81,7 +85,7 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
   const fetchComments = async () => {
     const { data } = await supabase
       .from('comments')
-      .select('*, author:profiles!comments_author_id_fkey(id, username)')
+      .select('*, author:profiles!comments_author_id_fkey(id, username, is_verified)')
       .eq('post_id', post.id)
       .order('created_at', { ascending: false });
     if (data) setComments(data as any);
@@ -279,6 +283,8 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
   const topLevelComments = comments.filter(c => !c.parent_comment_id);
   const getReplies = (parentId: string) => comments.filter(c => c.parent_comment_id === parentId);
 
+  const isMediaVideo = (url: string) => url.includes('.mp4') || url.includes('.webm') || url.includes('.mov') || url.includes('video');
+
   const authorDisplay = (
     <div className="flex items-center gap-2">
       {user ? (
@@ -291,11 +297,14 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
         </div>
       )}
       <div>
-        {user ? (
-          <Link to={`/profile/${post.author.id}`} className="font-semibold text-sm hover:underline">{post.author.username}</Link>
-        ) : (
-          <p className="font-semibold text-sm">{post.author.username}</p>
-        )}
+        <div className="flex items-center gap-0.5">
+          {user ? (
+            <Link to={`/profile/${post.author.id}`} className="font-semibold text-sm hover:underline">{post.author.username}</Link>
+          ) : (
+            <p className="font-semibold text-sm">{post.author.username}</p>
+          )}
+          {post.author.is_verified && <VerifiedBadge />}
+        </div>
         <p className="text-xs text-muted-foreground">
           {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
         </p>
@@ -307,7 +316,7 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
     const isCommentAuthor = user?.id === c.author.id;
     const canEditComment = isMod || (isCommentAuthor && canEditTime(c.created_at));
     const canDeleteComment = isMod || (isCommentAuthor && canDeleteTime(c.created_at));
-    const isVideo = c.media_url && (c.media_url.includes('.mp4') || c.media_url.includes('.webm') || c.media_url.includes('.mov') || c.media_url.includes('video'));
+    const isVideo = c.media_url && isMediaVideo(c.media_url);
 
     return (
       <div key={c.id} className={`flex gap-2 ${isReply ? 'ml-8' : ''}`}>
@@ -324,17 +333,15 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
         )}
         <div className="bg-muted rounded-lg px-3 py-2 flex-1">
           <div className="flex items-center justify-between">
-            {user ? (
-              <Link to={`/profile/${c.author.id}`} className="text-xs font-semibold hover:underline">{c.author.username}</Link>
-            ) : (
-              <span className="text-xs font-semibold">{c.author.username}</span>
-            )}
-            <div className="flex items-center gap-1">
-              {user && !isReply && (
-                <button onClick={() => { setReplyToId(c.id); setReplyToUsername(c.author.username); }} className="text-muted-foreground hover:text-primary" title="Reply">
-                  <Reply className="h-3 w-3" />
-                </button>
+            <div className="flex items-center gap-0.5">
+              {user ? (
+                <Link to={`/profile/${c.author.id}`} className="text-xs font-semibold hover:underline">{c.author.username}</Link>
+              ) : (
+                <span className="text-xs font-semibold">{c.author.username}</span>
               )}
+              {c.author.is_verified && <BadgeCheck className="h-3.5 w-3.5 text-blue-500 shrink-0" />}
+            </div>
+            <div className="flex items-center gap-1">
               {canEditComment && (
                 <button onClick={() => { setEditingCommentId(c.id); setEditCommentContent(c.content); }} className="text-muted-foreground hover:text-foreground">
                   <Pencil className="h-3 w-3" />
@@ -371,9 +378,19 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
                   <img src={c.media_url} alt="" className="w-full rounded max-h-48 object-cover mt-1 border" loading="lazy" />
                 )
               )}
-              <p className="text-[10px] text-muted-foreground mt-1">
-                {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
-              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-[10px] text-muted-foreground">
+                  {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
+                </p>
+                {user && (
+                  <button
+                    onClick={() => { setReplyToId(c.id); setReplyToUsername(c.author.username); }}
+                    className="text-[11px] text-muted-foreground hover:text-primary font-medium flex items-center gap-0.5"
+                  >
+                    <Reply className="h-3 w-3" /> Reply
+                  </button>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -433,12 +450,11 @@ const PostCard = ({ post, onUpdate, expanded = false, autoShowComments = false }
           </>
         )}
 
-        {/* Only show media in expanded view */}
-        {expanded && post.image_urls && post.image_urls.length > 0 && (
+        {/* Show media - always visible */}
+        {post.image_urls && post.image_urls.length > 0 && (
           <div className={`grid gap-2 ${post.image_urls.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
             {post.image_urls.map((url, i) => {
-              const isVideo = url.includes('.mp4') || url.includes('.webm') || url.includes('.mov') || url.includes('video');
-              return isVideo ? (
+              return isMediaVideo(url) ? (
                 <video key={i} src={url} controls className="w-full rounded-lg max-h-64 border" />
               ) : (
                 <img key={i} src={url} alt="" className="w-full rounded-lg object-cover max-h-64 border" loading="lazy" />

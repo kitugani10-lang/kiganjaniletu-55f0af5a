@@ -20,7 +20,7 @@ const PostDetail = () => {
     if (!id) return;
     const { data } = await supabase
       .from('posts')
-      .select('*, author:profiles!posts_author_id_fkey(id, username)')
+      .select('*, author:profiles!posts_author_id_fkey(id, username, is_verified)')
       .eq('id', id)
       .single();
 
