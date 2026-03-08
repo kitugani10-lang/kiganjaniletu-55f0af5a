@@ -3,3 +3,9 @@ project_id = "xzcfrrywsqswdulacpem"
 [auth]
 site_url = "http://localhost:5173"
 jwt_expiry = 2592000
+
+[functions.og-image]
+verify_jwt = false
+
+[functions.notify-report]
+verify_jwt = false
