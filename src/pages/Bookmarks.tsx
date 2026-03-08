@@ -25,7 +25,7 @@ const Bookmarks = () => {
     const postIds = bookmarks.map(b => b.post_id);
     const { data: postsData } = await supabase
       .from('posts')
-      .select('*, author:profiles!posts_author_id_fkey(id, username)')
+      .select('*, author:profiles_public!posts_author_id_fkey(id, username)')
       .in('id', postIds);
 
     if (!postsData) { setLoading(false); return; }

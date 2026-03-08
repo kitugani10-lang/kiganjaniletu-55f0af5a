@@ -48,7 +48,7 @@ const Auth = () => {
     if (!username || username.length < 6) { setUsernameAvailable(null); return; }
     const timer = setTimeout(async () => {
       setCheckingUsername(true);
-      const { data } = await supabase.from('profiles').select('id').eq('username', username.trim()).maybeSingle();
+      const { data } = await supabase.from('profiles_public').select('id').eq('username', username.trim()).maybeSingle();
       setUsernameAvailable(!data);
       setCheckingUsername(false);
     }, 500);

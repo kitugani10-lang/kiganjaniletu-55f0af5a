@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     .eq("status", "approved");
 
   const { count: membersCount } = await supabase
-    .from("profiles")
+    .from("profiles_public")
     .select("*", { count: "exact", head: true });
 
   if (postId) {

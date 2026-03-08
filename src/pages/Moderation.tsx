@@ -92,14 +92,14 @@ const Moderation = () => {
   const fetchPending = useCallback(async () => {
     const { data: posts } = await supabase
       .from('posts')
-      .select('id, title, content, image_urls, created_at, author:profiles!posts_author_id_fkey(username)')
+      .select('id, title, content, image_urls, created_at, author:profiles_public!posts_author_id_fkey(username)')
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
     if (posts) setPendingPosts(posts as any);
 
     const { data: comments } = await supabase
       .from('comments')
-      .select('id, content, media_url, created_at, author:profiles!comments_author_id_fkey(username), post:posts!comments_post_id_fkey(title)')
+      .select('id, content, media_url, created_at, author:profiles_public!comments_author_id_fkey(username), post:posts!comments_post_id_fkey(title)')
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
     if (comments) setPendingComments(comments as any);
@@ -160,7 +160,7 @@ const Moderation = () => {
     if (!newModUsername.trim()) return;
     setAddingMod(true);
     try {
-      const { data: profile } = await supabase.from('profiles').select('id').eq('username', newModUsername.trim()).maybeSingle();
+      const { data: profile } = await supabase.from('profiles_public').select('id').eq('username', newModUsername.trim()).maybeSingle();
       if (!profile) { toast.error('User not found'); setAddingMod(false); return; }
       const { error } = await supabase.from('user_roles').insert({ user_id: profile.id, role: 'moderator' });
       if (error) {
