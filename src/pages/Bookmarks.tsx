@@ -23,19 +23,30 @@ const Bookmarks = () => {
     if (!bookmarks || bookmarks.length === 0) { setPosts([]); setLoading(false); return; }
 
     const postIds = bookmarks.map(b => b.post_id);
-    const { data: postsData } = await supabase
-      .from('posts')
-      .select('*, author:profiles_public!posts_author_id_fkey(id, username)')
-      .in('id', postIds);
 
+    // Fetch posts, likes, comments in parallel
+    const [postsRes, likesRes, commentsRes] = await Promise.all([
+      supabase.from('posts').select('id, title, content, created_at, image_urls, category, status, author_id').in('id', postIds),
+      supabase.from('likes').select('post_id, user_id').in('post_id', postIds),
+      supabase.from('comments').select('post_id').in('post_id', postIds),
+    ]);
+
+    const postsData = postsRes.data;
     if (!postsData) { setLoading(false); return; }
 
-    const { data: likesData } = await supabase.from('likes').select('post_id, user_id').in('post_id', postIds);
-    const { data: commentsData } = await supabase.from('comments').select('post_id').in('post_id', postIds);
+    // Fetch authors separately
+    const authorIds = [...new Set(postsData.map((p: any) => p.author_id).filter(Boolean))];
+    const { data: authorsData } = authorIds.length > 0
+      ? await supabase.from('profiles_public').select('id, username, is_verified, avatar_url').in('id', authorIds)
+      : { data: [] };
+    const authorsById = new Map((authorsData || []).map((a: any) => [a.id, a]));
+
+    const likesData = likesRes.data;
+    const commentsData = commentsRes.data;
 
     const enriched = postsData.map((p: any) => ({
       id: p.id, title: p.title, content: p.content, created_at: p.created_at,
-      author: p.author, image_urls: p.image_urls || [], category: p.category,
+      author: authorsById.get(p.author_id) || { id: p.author_id, username: 'Unknown user', is_verified: false, avatar_url: null }, image_urls: p.image_urls || [], category: p.category,
       likes_count: likesData?.filter(l => l.post_id === p.id).length || 0,
       comments_count: commentsData?.filter(c => c.post_id === p.id).length || 0,
       user_liked: likesData?.some(l => l.post_id === p.id && l.user_id === user.id) || false,
