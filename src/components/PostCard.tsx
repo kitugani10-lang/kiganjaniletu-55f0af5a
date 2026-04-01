@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useModRole } from '@/hooks/useModRole';
 import { uploadFile, compressImage } from '@/lib/supabaseStorage';
+import { containsMiddleFinger, suspendUserForEmoji, checkSuspension } from '@/lib/moderation';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
