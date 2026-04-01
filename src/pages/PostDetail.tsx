@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import Navbar from '@/components/Navbar';
 import PostCard from '@/components/PostCard';
+import GuestLoginPrompt from '@/components/GuestLoginPrompt';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
