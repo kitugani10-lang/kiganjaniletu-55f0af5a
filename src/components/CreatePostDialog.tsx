@@ -17,7 +17,7 @@ interface Props {
 }
 
 const MAX_CHARS = 25000;
-const MAX_IMAGES = 2;
+const MAX_IMAGES = 10;
 const MAX_VIDEO_MB = 50;
 
 const CreatePostDialog = ({ onPostCreated, defaultCategory }: Props) => {
