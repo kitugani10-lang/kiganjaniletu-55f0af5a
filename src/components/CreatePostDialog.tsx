@@ -78,6 +78,20 @@ const CreatePostDialog = ({ onPostCreated, defaultCategory }: Props) => {
     if (!category) { toast.error('Please select a category'); return; }
     if (content.length > MAX_CHARS) { toast.error(`Content must be under ${MAX_CHARS.toLocaleString()} characters`); return; }
 
+    // Check for middle finger emoji
+    if (containsMiddleFinger(title) || containsMiddleFinger(content)) {
+      toast.error('Your account has been suspended for 14 days for using a prohibited emoji.');
+      try { await suspendUserForEmoji(user!.id); } catch {}
+      return;
+    }
+
+    // Check suspension
+    const { suspended, expiresAt } = await checkSuspension(user!.id);
+    if (suspended) {
+      toast.error(`Your account is suspended until ${new Date(expiresAt!).toLocaleDateString()}. You can only read content.`);
+      return;
+    }
+
     setLoading(true);
     try {
       const mediaUrls: string[] = [];
